@@ -49,19 +49,19 @@ def call_gpt(messages, functions=None, **kwargs):
         if "tool_call_id" in message:
             message.pop('tool_call_id')
             message['role'] = 'function'
-    @retry(wait=wait_random_exponential(multiplier=10, max=50), stop=stop_after_attempt(5))
+
+    @retry(wait=wait_random_exponential(multiplier=10, max=50),
+           stop=stop_after_attempt(5))
     def call_gpt_retry(messages, functions):
         ts = time.time()
         try:
-            response = client.chat.completions.create(
-                        seed=123,
-                        messages=messages,
-                        functions=functions,
-                        **kwargs
-                    )
+            response = client.chat.completions.create(seed=123,
+                                                      messages=messages,
+                                                      functions=functions,
+                                                      **kwargs)
         except openai.BadRequestError as e:
             raise e
-           
+
         except openai.RateLimitError as e:
             time.sleep(50)
             raise e
@@ -69,9 +69,10 @@ def call_gpt(messages, functions=None, **kwargs):
             raise e
         except Exception as e:
             raise e
-            
+
         t = time.time() - ts
         return response, t
+
     t_s = time.time()
     try:
         response, t_real = call_gpt_retry(messages_converted, functions)
@@ -79,24 +80,41 @@ def call_gpt(messages, functions=None, **kwargs):
         # print(response.choices[0].message.function_call)
         if response.choices[0].finish_reason == 'function_call':
             response_json = json.loads(response.json())
-            tool_call = {'arguments': response_json['choices'][0]['message']['function_call']['arguments'], 'name': response_json['choices'][0]['message']['function_call']['name']}
-            response.choices[0].message.tool_calls = [dotdict({'id':'111', 'function':dotdict(tool_call)})]
+            tool_call = {
+                'arguments':
+                response_json['choices'][0]['message']['function_call']
+                ['arguments'],
+                'name':
+                response_json['choices'][0]['message']['function_call']['name']
+            }
+            response.choices[0].message.tool_calls = [
+                dotdict({
+                    'id': '111',
+                    'function': dotdict(tool_call)
+                })
+            ]
         else:
-            if model_name == 'gpt-4-turbo':
+            # if model_name == 'gpt-4-turbo':
+            if 'gpt-4' in model_name:
                 response.choices[0].message.tool_calls = []
-            # else:
-                # response.choices[0].message['tool_calls'] = []
+        # else:
+        # response.choices[0].message['tool_calls'] = []
         if response.usage is None:
-            token_cnt = len(enc.encode(str(functions))) + len(enc.encode(str(messages))) + len(enc.encode(str(response.choices[0].message.content)))
+            token_cnt = len(enc.encode(str(functions))) + len(
+                enc.encode(str(messages))) + len(
+                    enc.encode(str(response.choices[0].message.content)))
             response.usage = dotdict({'total_tokens': token_cnt})
         else:
-            print(colored('tokens', 'blue'), colored(response.usage.total_tokens, 'blue'))
+            print(colored('tokens', 'blue'),
+                  colored(response.usage.total_tokens, 'blue'))
         return response
-        
+
     except Exception as e:
         raise e
         t = time.time() - t_s
-        print('minus:', t, file=open(os.path.join(output_dir, "time.txt"), "a"))
+        print('minus:',
+              t,
+              file=open(os.path.join(output_dir, "time.txt"), "a"))
         return "openai error"
 
 def call_gpt_no_func(messages):
@@ -121,7 +139,7 @@ def call_gpt_turbo(messages, functions):
             "function": function
         })
     # time.sleep(1)
-        
+
     @retry(wait=wait_random_exponential(multiplier=5, max=20), stop=stop_after_attempt(10))
     def call_gpt_retry(messages, functions):
         t_s = time.time()
@@ -144,12 +162,12 @@ def call_gpt_turbo(messages, functions):
             raise e
         except openai.InternalServerError as e:
             return "internal server error", 0
-        
+
         t = time.time() - t_s
         return response, t
     t_s = time.time()
     try:
-    # if True:
+        # if True:
         response, t_real = call_gpt_retry(messages, functions_new)
         t = time.time() - t_s
         print(f'{datetime.now()}', file=open(os.path.join(output_dir, "time.txt"), "a"))

@@ -15,13 +15,13 @@ output_dir = args.output_dir
 from config import *
 if api_type == "azure":
     from openai import AzureOpenAI as Client
+    client = Client(
+        api_key=api_key,
+        api_version=api_version,
+        azure_endpoint=api_base)
 else:
     from openai import OpenAI as Client
-client = Client(
-    api_key=api_key,
-    api_version=api_version,
-    azure_endpoint = api_base
-    )
+    client = Client(api_key=api_key)
 
 __registered_evaluators__ = {}
 
@@ -68,7 +68,7 @@ class OpenaiPoolRequest:
         # item = self.pool[key_pos]
         # kwargs['api_key'] = item['api_key']
         # if item.get('organization',None) is not None:
-        #     kwargs['organization'] = item['organization'] 
+        #     kwargs['organization'] = item['organization']
         # kwargs['engine'] = 'gpt-35-turbo'
         kwargs['model'] = model_name
         # kwargs['model'] = 'gpt-35-turbo-16k'
@@ -79,7 +79,6 @@ class OpenaiPoolRequest:
             time.sleep(40)
             raise e
         return response
-    
+
     def __call__(self,messages,**kwargs):
         return self.request(messages,**kwargs)
-   

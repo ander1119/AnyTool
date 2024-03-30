@@ -13,13 +13,13 @@ from arguments import parse_args
 from config import *
 if api_type == "azure":
     from openai import AzureOpenAI as Client
+    client = Client(api_version=api_version,
+                    api_key=api_key,
+                    azure_endpoint=api_base)
 else:
     from openai import OpenAI as Client
-client = Client(
-    api_version=api_version,
-    api_key = api_key,
-    azure_endpoint = api_base
-)
+    client = Client(api_key=api_key)
+
 def get_embedding(text, model="text-embedding-ada-002"):
     if isinstance(text, list):
         print(len(text))
@@ -159,17 +159,17 @@ def sample_apis(gt_apis, num=200):
                 continue
             sampled_apis = random.sample(apis_origin, min(10, len(apis_origin)))
             apis.extend(sampled_apis)
-    
+
     return categories, tools, apis
-    
+
 get_api_details_function = {
     'name': 'get_api_details',
     'description': 'get the details of a specific api',
     'parameters': {
         'type': 'object',
         'properties': {
-            'category_name': {'type': 'string'}, 
-            'tool_name': {'type': 'string'}, 
+            'category_name': {'type': 'string'},
+            'tool_name': {'type': 'string'},
             'api_name': {'type': 'string'}
         },
         'required': ['category_name', 'tool_name', 'api_name']
@@ -194,7 +194,7 @@ get_apis_in_tool_function = {
     'parameters': {
         'type': 'object',
         'properties': {
-            'category_name': {'type': 'string'}, 
+            'category_name': {'type': 'string'},
             'tool_name': {'type': 'string'}
         },
         'required': ['category_name', 'tool_name']
@@ -220,9 +220,9 @@ get_tools_descriptions_function = {
     'parameters': {
         'type': 'object',
         'properties': {
-            'category_name':{'type':'string'}, 
+            'category_name':{'type':'string'},
             'tool_list': {
-                'type': 'array', 
+                'type': 'array',
                 'items': {'type': 'string'}
             }
         },
@@ -273,7 +273,7 @@ def query_all_tool_info(category:str, tools: list) -> list:
         return {'Error': 'Tools must be a list', 'response':''}
     res = {}
     all_tools = api_details_dict[category]
-    
+
     for tool in tools:
         if tool not in all_tools:
             return {'Error': f'Tool name {tool} not found', 'response':''}
@@ -311,11 +311,11 @@ def get_tools_descriptions(category_name: str, tool_list: str) -> dict:
 #     api_details = get_api_details(api_name)
 #     if api_details is None:
 #         return 'api name not found'
-    # return api_details['response_example']
+# return api_details['response_example']
 split_function = lambda x: x.split("}")
 # # 1. create an RetrieveAssistantAgent instance named "assistant"
 # assistant = RetrieveAssistantAgent(
-#     name="assistant", 
+#     name="assistant",
 #     system_message="You are a helpful assistant. You should help the user find the relevant apis for their tasks. Return the category_name, tool_name and api_name exactly as in your context. Do not make up them",
 #     llm_config={
 #         # "request_timeout": 600,
@@ -343,7 +343,7 @@ split_function = lambda x: x.split("}")
 # print("models to use: ", [config_list[i]["model"] for i in range(len(config_list))])
 
 
-#  Accepted file formats for that can be stored in 
+#  Accepted file formats for that can be stored in
 # a vector database instance
 from autogen.retrieve_utils import TEXT_FORMATS
 
@@ -367,19 +367,20 @@ ragproxyagent = RetrieveUserProxyAgent(
         # "embedding_model": "text-embedding-ada-002",
         # "embedding_model": "all-mpnet-base-v2",
         "embedding_function": embedding_function,
-        "get_or_create": True,  # set to True if you want to recreate the collection
+        "get_or_create":
+        True,  # set to True if you want to recreate the collection
         # "custom_split_function": split_function,
         "collection_name": "toolbench",
         "must_break_at_empty_line": False
     },
-)
+    code_execution_config={'use_docker': False})
 def summarize_context(query, context):
     messages = [{
         "role": "system",
         "content": """You are a helpful assistant. Given a task description, you should help the user find  the relevant APIs in the context. Each API consists of category_name, tool_name and api_name. Do not make up them. 
         You should call Finish function with the api list. Each element of the list is a dictionary with keys 'category_name', 'tool_name', 'api_name'. Remember, you must call Finish function at one step.""",
     },
-        {"role": "user", 
+        {"role": "user",
         "content": f"Task description: {query}. Can you help me find the relevant category_names, tool_names, and api_names in following context: {context}"}
         ]
     functions = [finish_function]
@@ -401,7 +402,7 @@ def summarize_context(query, context):
                             continue
                     except:
                         continue
-                        
+
                 else:
                     continue
                 return api_list
@@ -532,7 +533,7 @@ def fetch_api_json(api_list):
         if not append_flag:
             print(api_name, api_dict_names)
     return api_list_new, index_list
-    
+
 def api_json_to_openai_json(api_json,standard_tool_name):
     description_max_length=256
     templete =     {
@@ -546,7 +547,7 @@ def api_json_to_openai_json(api_json,standard_tool_name):
             "optional": [],
         }
     }
-    
+
     map_type = {
         "NUMBER": "integer",
         "STRING": "string",
@@ -558,7 +559,7 @@ def api_json_to_openai_json(api_json,standard_tool_name):
     templete["name"] = templete["name"][-64:]
 
     templete["description"] = f"This is the subfunction for tool \"{standard_tool_name}\", you can use this tool."
-    
+
     if api_json["api_description"].strip() != "":
         tuncated_description = api_json['api_description'].strip().replace(api_json['api_name'],templete['name'])[:description_max_length]
         templete["description"] = templete["description"] + f"The description of this function is: \"{tuncated_description}\""
@@ -576,7 +577,7 @@ def api_json_to_openai_json(api_json,standard_tool_name):
             }
 
             default_value = para['default']
-            if len(str(default_value)) != 0:    
+            if len(str(default_value)) != 0:
                 prompt = {
                     "type":param_type,
                     "description":para["description"][:description_max_length],
@@ -599,7 +600,7 @@ def api_json_to_openai_json(api_json,standard_tool_name):
                 param_type = "string"
 
             default_value = para['default']
-            if len(str(default_value)) != 0:    
+            if len(str(default_value)) != 0:
                 prompt = {
                     "type":param_type,
                     "description":para["description"][:description_max_length],
